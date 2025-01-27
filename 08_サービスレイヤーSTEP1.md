@@ -1,8 +1,15 @@
-今回は、ビジネスロジックを担当するサービスレイヤーをTDDで実装していきます。
+# 第8章 TodoServiceの基本実装
 
-## 1. TodoServiceの基本実装
+## 8.1 サービスレイヤーの役割
 
-まず、TodoServiceのテストを作成します
+サービスレイヤーの担当は以下です。
+
+- ビジネスロジックの実装
+- 入力値の詳細なバリデーション
+- セキュリティ対策（XSS対策など）
+- リポジトリレイヤーの抽象化
+
+## 8.2 基本実装のテスト
 
 ```typescript
 // src/services/todo.service.test.ts
@@ -20,7 +27,7 @@ describe('TodoService', () => {
     });
 
     describe('createTodo', () => {
-        test('creates a todo with valid input', async () => {
+        it('creates a todo with valid input', async () => {
             const dto: CreateTodoDTO = {
                 title: 'Test Todo',
                 description: 'Test Description'
@@ -32,107 +39,35 @@ describe('TodoService', () => {
             expect(todo.description).toBe(dto.description);
             expect(todo.completed).toBe(false);
         });
+
+        it('sanitizes HTML content from input', async () => {
+            const dto: CreateTodoDTO = {
+                title: '<script>alert("xss")</script>Test Todo',
+                description: '<img src="x" onerror="alert()">Description'
+            };
+
+            const todo = await service.createTodo(dto);
+            
+            expect(todo.title).toBe('Test Todo');
+            expect(todo.description).toBe('Description');
+        });
     });
 });
 ```
 
-テスト結果
-```
-FAIL  src/services/todo.service.test.ts
-  ● Test suite failed to run
-    Cannot find module './todo.service' from 'src/services/todo.service.test.ts'
-```
+**テストのポイント：**
+1. サービスとリポジトリの依存関係の設定
+2. 基本的なTodo作成機能の確認
+3. セキュリティ対策（XSS対策）の検証
 
-TodoServiceの基本実装を作成します
-
-```typescript
-// src/services/todo.service.ts
-import { TodoRepository } from '../repositories/todo.repository';
-import { CreateTodoDTO, UpdateTodoDTO, Todo } from '../types';
-
-export class TodoService {
-    constructor(private repository: TodoRepository) {}
-
-    async createTodo(dto: CreateTodoDTO): Promise<Todo> {
-        return this.repository.create(dto);
-    }
-}
-```
-
-テスト結果
-```
-PASS  src/services/todo.service.test.ts
-  TodoService
-    createTodo
-      ✓ creates a todo with valid input (3ms)
-```
-
-## 2. バリデーションとビジネスルールの追加
-
-まず、必要なパッケージをインストールします
+## 8.3 依存パッケージのインストール
 
 ```bash
 npm install sanitize-html
 npm install --save-dev @types/sanitize-html
 ```
 
-サービスレイヤーでより厳密なバリデーションとビジネスルールを実装します。
-テストを追加します
-
-```typescript
-// src/services/todo.service.test.ts
-describe('createTodo', () => {
-    // 既存のテスト...
-
-    test('throws error for title exceeding maximum length', async () => {
-        const dto: CreateTodoDTO = {
-            title: 'a'.repeat(101),  // 101文字
-            description: 'Test Description'
-        };
-
-        await expect(service.createTodo(dto))
-            .rejects
-            .toThrow('Title cannot exceed 100 characters');
-    });
-
-    test('throws error for description exceeding maximum length', async () => {
-        const dto: CreateTodoDTO = {
-            title: 'Test Todo',
-            description: 'a'.repeat(501)  // 501文字
-        };
-
-        await expect(service.createTodo(dto))
-            .rejects
-            .toThrow('Description cannot exceed 500 characters');
-    });
-
-    test('sanitizes malicious content in title and description', async () => {
-        const dto: CreateTodoDTO = {
-            title: '<script>alert("xss")</script>Test Todo<p onclick="alert()">',
-            description: '<b onclick="alert()">Description</b><img src="x" onerror="alert()">'
-        };
-
-        const todo = await service.createTodo(dto);
-        
-        expect(todo.title).toBe('Test Todo');
-        expect(todo.description).toBe('Description');
-    });
-
-    test('trims whitespace from title and description', async () => {
-        const dto: CreateTodoDTO = {
-            title: '  Test Todo  ',
-            description: '  Description  '
-        };
-
-        const todo = await service.createTodo(dto);
-        
-        expect(todo.title).toBe('Test Todo');
-        expect(todo.description).toBe('Description');
-    });
-});
-```
-
-実装を更新します
+## 8.4 サービスの実装
 
 ```typescript
 // src/services/todo.service.ts
@@ -141,29 +76,27 @@ import { CreateTodoDTO, Todo } from '../types';
 import sanitizeHtml from 'sanitize-html';
 
 export class TodoService {
-    private readonly MAX_TITLE_LENGTH = 100;
-    private readonly MAX_DESCRIPTION_LENGTH = 500;
-
     constructor(private repository: TodoRepository) {}
 
     async createTodo(dto: CreateTodoDTO): Promise<Todo> {
-        // 入力値の検証とサニタイズ
+        // 入力値のサニタイズ
         const sanitizedTitle = this.sanitizeText(dto.title);
         const sanitizedDescription = dto.description 
             ? this.sanitizeText(dto.description)
             : undefined;
 
         // タイトルの長さチェック
-        if (sanitizedTitle.length > this.MAX_TITLE_LENGTH) {
+        if (sanitizedTitle.length > 100) {
             throw new Error('Title cannot exceed 100 characters');
         }
 
-        // 説明文の長さチェック
+        // 説明文の長さチェック（存在する場合）
         if (sanitizedDescription && 
-            sanitizedDescription.length > this.MAX_DESCRIPTION_LENGTH) {
+            sanitizedDescription.length > 500) {
             throw new Error('Description cannot exceed 500 characters');
         }
 
+        // リポジトリを使用してTodoを作成
         return this.repository.create({
             title: sanitizedTitle,
             description: sanitizedDescription
@@ -172,27 +105,67 @@ export class TodoService {
 
     private sanitizeText(text: string): string {
         return sanitizeHtml(text, {
-            allowedTags: [],      // HTMLタグを全て除去
+            allowedTags: [],       // HTMLタグを全て除去
             allowedAttributes: {}, // 属性を全て除去
         }).trim();
     }
 }
 ```
 
-実装のポイント
-- `sanitize-html`パッケージを使用して安全なサニタイズを実現
-- 全てのHTMLタグと属性を除去
-- テキストのトリミングも同時に実施
-- 未定義の説明文は`undefined`のまま維持
+**実装のポイント：**
 
-テスト結果
-```
+1. **依存性注入**
+   ```typescript
+   constructor(private repository: TodoRepository) {}
+   ```
+   - リポジトリをコンストラクタで注入
+   - テストやメンテナンスを容易に
+
+2. **入力値のサニタイズ**
+   ```typescript
+   private sanitizeText(text: string): string {
+       return sanitizeHtml(text, {
+           allowedTags: [],
+           allowedAttributes: {},
+       }).trim();
+   }
+   ```
+   - XSS攻撃の防止
+   - HTMLタグと属性の完全な除去
+
+3. **バリデーションルール**
+   ```typescript
+   if (sanitizedTitle.length > 100) {
+       throw new Error('Title cannot exceed 100 characters');
+   }
+   ```
+   - 明確な長さ制限
+   - エラーメッセージの具体化
+
+## 8.5 テスト実行結果
+
+```bash
 PASS  src/services/todo.service.test.ts
   TodoService
     createTodo
       ✓ creates a todo with valid input (3ms)
-      ✓ throws error for title exceeding maximum length (1ms)
-      ✓ throws error for description exceeding maximum length (1ms)
-      ✓ sanitizes malicious content in title and description (2ms)
-      ✓ trims whitespace from title and description (1ms)
+      ✓ sanitizes HTML content from input (1ms)
 ```
+
+## 8.6 リポジトリレイヤーとの違い
+
+サービスレイヤーでは、リポジトリレイヤーにはない以下の処理を追加しています：
+
+1. **セキュリティ対策**
+   - HTMLコンテンツのサニタイズ
+   - 悪意のあるスクリプトの除去
+
+2. **より厳密なバリデーション**
+   - 文字数制限
+   - コンテンツの品質チェック
+
+3. **ビジネスルールの適用**
+   - より具体的なエラーメッセージ
+   - アプリケーション固有のルール
+
+次章では、より高度なバリデーションとビジネスルールの実装に進みます。
