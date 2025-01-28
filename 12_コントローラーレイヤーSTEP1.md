@@ -1,96 +1,126 @@
-## 3. バリデーションとエラーハンドリングの実装
 
-まず、バリデーション用のテストケースを追加します
+# 第12章 コントローラーレイヤーの検索エンドポイント実装
+
+## 12.1 検索エンドポイントのテスト
 
 ```typescript
 // src/controllers/todo.controller.test.ts
-describe('POST /todos', () => {
-    // 既存のテスト...
+describe('TodoController', () => {
+    let app: Express;
+    let controller: TodoController;
+    let service: TodoService;
 
-    test('returns 400 when title is missing', async () => {
-        const response = await request(app)
-            .post('/todos')
-            .send({
-                description: 'Test Description'
-            });
-        // タイトルがないリクエストを送信→400エラーとエラーメッセージを確認
+    beforeEach(async () => {
+        app = express();
+        app.use(express.json());
+        
+        const repository = new TodoRepository();
+        service = new TodoService(repository);
+        controller = new TodoController(service);
 
-        expect(response.status).toBe(400);
-        expect(response.body).toEqual({
-            errors: ['Title is required']
-        });
+        // ルーティングの設定
+        app.get('/todos', controller.getTodos.bind(controller));
+        app.post('/todos', createTodoValidation, controller.createTodo.bind(controller));
+        app.patch('/todos/:id', controller.updateTodo.bind(controller));
+
+
+        // テストデータを準備
+        const todo1 = await request(app)
+        .post('/todos')
+        .send({ title: 'Shopping', description: 'Buy groceries' });
+
+        const todo2 = await request(app)
+        .post('/todos')
+        .send({ title: 'Coding', description: 'Implement search' });
+
+        const todo3 = await request(app)
+        .post('/todos')
+        .send({ title: 'Reading', description: 'Read book' });
+
+        // 完了状態の更新を待つ
+        await request(app)
+        .patch(`/todos/${todo3.body.id}`)
+        .send({ completed: true });
     });
 
-    test('returns 400 when title is empty', async () => {
-        const response = await request(app)
-            .post('/todos')
-            .send({
-                title: '',
-                description: 'Test Description'
-            });
-        // 空のタイトルでリクエスト→400エラーとエラーメッセージを確認
+    describe('GET /todos', () => {
+        it('returns all todos when no query parameters', async () => {
+            const response = await request(app).get('/todos');
 
-        expect(response.status).toBe(400);
-        expect(response.body).toEqual({
-            errors: ['Title must not be empty']
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(3);
         });
-    });
 
-    test('handles service errors gracefully', async () => {
-        const response = await request(app)
-            .post('/todos')
-            .send({
-                title: 'a'.repeat(101),  // 最大長を超過
-                description: 'Test Description'
+        it('filters todos by search term', async () => {
+            const response = await request(app)
+                .get('/todos')
+                .query({ search: 'ing' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(3);
+            expect(response.body.map((todo: any) => todo.title))
+                .toEqual(expect.arrayContaining(['Shopping', 'Coding', 'Reading']));
+        });
+
+        it('filters todos by completion status', async () => {
+            const response = await request(app)
+                .get('/todos')
+                .query({ completed: 'true' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0].title).toBe('Reading');
+        });
+
+        it('handles invalid completed parameter', async () => {
+            const response = await request(app)
+                .get('/todos')
+                .query({ completed: 'invalid' });
+
+            expect(response.status).toBe(400);
+            expect(response.body).toEqual({
+                errors: ['Completed status must be true or false']
             });
-        // 長すぎるタイトルでリクエスト→400エラーとエラーメッセージを確認
-
-        expect(response.status).toBe(400);
-        expect(response.body).toEqual({
-            errors: ['Title cannot exceed 100 characters']
         });
     });
 });
 ```
-これらのテストにより、APIが異常系の入力に対して適切に対応できることを確認
 
+テスト実行結果：
+```bash
+ FAIL  src/controllers/todo.controller.test.ts
+ ● Test suite failed to run
+    src/controllers/todo.controller.test.ts:23:38 - error TS2339: Property 'getTodos' does not exist on type 'TodoController'.
+```
 
-続いて、express-validatorを使用してバリデーションを実装します。
+## 12.2 クエリパラメータのバリデーション
+
 ```typescript
 // src/middleware/validation.ts
-import { body, ValidationChain } from 'express-validator';
+import { query, ValidationChain } from 'express-validator';
 
-export const createTodoValidation: ValidationChain[] = [
-    body('title')
-        .exists()
-        .withMessage('Title is required')
-        .bail()
-        .notEmpty()
-        .withMessage('Title must not be empty')
-        .trim(),
-    
-    body('description')
+export const getTodosValidation: ValidationChain[] = [
+    query('completed')
         .optional()
-        .trim(),
+        .isBoolean()
+        .withMessage('Completed status must be true or false')
+        .toBoolean(),
+    
+    query('search')
+        .optional()
+        .isString()
+        .trim()
 ];
 ```
-- `.bail()` を追加して、最初のバリデーションエラーで処理を停止
-- これにより、titleが存在しない場合は "Title is required" のみが返される
-- titleが空文字の場合は "Title must not be empty" が返される
 
-コントローラーの実装を更新します。
+## 12.3 検索エンドポイントの実装
 
 ```typescript
 // src/controllers/todo.controller.ts
-import { Request, Response } from 'express';
-import { validationResult } from 'express-validator';
-import { TodoService } from '../services/todo.service';
-import { CreateTodoDTO } from '../types';
-
 export class TodoController {
     constructor(private service: TodoService) {}
 
-    async createTodo(req: Request, res: Response): Promise<void> {
+    async getTodos(req: Request, res: Response): Promise<void> {
         try {
             // バリデーション結果のチェック
             const errors = validationResult(req);
@@ -101,30 +131,34 @@ export class TodoController {
                 return;
             }
 
-            const todo = await this.service.createTodo(req.body as CreateTodoDTO);
-            res.status(201).json(todo);
-        } catch (error) {
-            if (error instanceof Error) {
-                res.status(400).json({ 
-                    errors: [error.message]
-                });
-            } else {
-                res.status(500).json({ 
-                    errors: ['Internal server error']
-                });
+            const { search, completed } = req.query;
+
+            const searchParams: TodoSearchParams = {};
+            if (typeof search === 'string') {
+                searchParams.title = search;
             }
+            if (completed !== undefined) {
+                // 型を文字列に変換してから比較
+                // completedがboolean型
+                searchParams.completed = String(completed).toLowerCase() === 'true';
+            }
+
+            const todos = await this.service.findTodos(searchParams);
+            res.json(todos);
+        } catch (error) {
+            res.status(500).json({ 
+                errors: ['Internal server error']
+            });
         }
     }
 }
 ```
 
-テストのセットアップも更新します
+テストのセットアップを更新
 
 ```typescript
 // src/controllers/todo.controller.test.ts
-import { createTodoValidation } from '../middleware/validation';
-
-beforeEach(() => {
+beforeEach(async () => {
     app = express();
     app.use(express.json());
     
@@ -133,24 +167,61 @@ beforeEach(() => {
     controller = new TodoController(service);
 
     // バリデーションミドルウェアを追加
+    app.get('/todos', getTodosValidation, controller.getTodos.bind(controller));
     app.post('/todos', createTodoValidation, controller.createTodo.bind(controller));
+    app.patch('/todos/:id', controller.updateTodo.bind(controller));
 });
 ```
-- express-validatorを使用した入力値の検証
-- エラーメッセージの統一フォーマット（errorsプロパティの配列）
-- リクエストボディのトリミング
-- サービス層のエラーも同じフォーマットで返却
 
-
-テスト結果
-```
+テスト実行結果：
+```bash
 PASS  src/controllers/todo.controller.test.ts
   TodoController
-    POST /todos
-      ✓ creates a new todo with valid input (45ms)
-      ✓ returns 400 when title is missing (12ms)
-      ✓ returns 400 when title is empty (11ms)
-      ✓ handles service errors gracefully (11ms)
+    GET /todos
+      ✓ returns all todos when no query parameters (42ms)
+      ✓ filters todos by search term (38ms)
+      ✓ filters todos by completion status (35ms)
+      ✓ handles invalid completed parameter (12ms)
 ```
 
-[続いて検索・更新・削除のエンドポイント実装に進みましょうか？]
+## 12.4 実装のポイント解説
+
+1. **クエリパラメータの処理**
+   ```typescript
+   const { search, completed } = req.query;
+   ```
+   - URLパラメータからの検索条件の取得
+   - 型安全な処理
+
+2. **バリデーションの適用**
+   ```typescript
+   query('completed')
+       .optional()
+       .isBoolean()
+       .withMessage('Completed status must be true or false')
+   ```
+   - クエリパラメータの型チェック
+   - エラーメッセージのカスタマイズ
+
+3. **検索パラメータの変換**
+   ```typescript
+   if (typeof search === 'string') {
+       searchParams.title = search;
+   }
+   ```
+   - HTTPクエリからサービスレイヤーの型への変換
+   - 型安全性の確保
+
+4. **エラーハンドリング**
+   ```typescript
+   try {
+       // ... 検索処理
+   } catch (error) {
+       res.status(500).json({ errors: ['Internal server error'] });
+   }
+   ```
+   - 予期せぬエラーの適切な処理
+   - ユーザーフレンドリーなエラーメッセージ
+
+次章では、更新エンドポイントの実装に進みます。
+
