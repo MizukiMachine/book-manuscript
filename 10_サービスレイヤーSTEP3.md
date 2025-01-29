@@ -1,6 +1,7 @@
 # 第10章 TodoServiceの検索機能実装
 
 ## 10.1 検索機能のテスト実装
+検索機能のテストを追加します。
 
 ```typescript
 // src/services/todo.service.test.ts

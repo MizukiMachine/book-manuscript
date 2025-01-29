@@ -2,7 +2,7 @@
 
 ## 5.1 IDによる検索機能
 
-### 5.1.1 検索機能のテスト実装
+### 1. 検索機能のテスト実装
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -34,6 +34,8 @@ describe('TodoRepository', () => {
     });
 });
 ```
+  
+
 
 テスト結果
 ```
@@ -49,8 +51,8 @@ FAIL  src/repositories/todo.repository.test.ts
     TypeError: repository.findById is not a function
 ```
 
-まだ実装していない`findById`メソッドがないためテストが失敗します。
-実装を追加しましょう
+まだ実装していない`findById`メソッドがないためテストが失敗します。  
+実装を追加しましょう。
 
 ### 5.1.2 検索機能の実装
 
@@ -82,7 +84,7 @@ PASS  src/repositories/todo.repository.test.ts
 
 ## 5.2 全件取得機能
 
-### 5.2.1 全件取得のテスト
+### 1. 全件取得のテスト
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -148,4 +150,5 @@ PASS  src/repositories/todo.repository.test.ts
       ✓ returns all todos (1ms)
 ```
 
-これで検索機能の基本的な実装は完了です。次章では、Todoの更新機能の実装に進みます。
+これで検索機能の基本的な実装は完了です。  
+次章では、Todoの更新機能の実装に進みます。

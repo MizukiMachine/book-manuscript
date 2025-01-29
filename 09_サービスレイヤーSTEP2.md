@@ -161,8 +161,8 @@ export class TodoService {
 
 3. **部分更新の処理**
    ```typescript
-   if (dto.title !== undefined) {
        // タイトルの更新処理
+   if (dto.title !== undefined) {
    }
    ```
    - 指定されたフィールドのみを更新

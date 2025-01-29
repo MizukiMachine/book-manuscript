@@ -2,7 +2,8 @@
 
 ## 11.1 準備
 
-まず、Express用の追加パッケージをインストールします：
+まず、Express用の追加パッケージをインストールします。  
+
 
 ```bash
 npm install express-validator
@@ -11,7 +12,8 @@ npm install --save-dev supertest @types/supertest
 
 ## 11.2 コントローラーの基本実装
 
-### 11.2.1 初期テストの作成
+### 1. 初期テストの作成
+この章は比較的易しいソースコードだと思います。
 
 ```typescript
 // src/controllers/todo.controller.test.ts
@@ -66,7 +68,7 @@ FAIL  src/controllers/todo.controller.test.ts
     Cannot find module './todo.controller'
 ```
 
-### 11.2.2 コントローラーの実装
+### 2. コントローラーの実装
 
 ```typescript
 // src/controllers/todo.controller.ts
@@ -102,7 +104,7 @@ PASS  src/controllers/todo.controller.test.ts
 
 ## 11.3 バリデーションの追加
 
-### 11.3.1 バリデーションのテスト
+### 1. バリデーションのテスト
 
 ```typescript
 // src/controllers/todo.controller.test.ts
@@ -138,7 +140,7 @@ describe('POST /todos', () => {
 });
 ```
 
-テスト実行結果：
+この段階のテスト実行結果：
 ```bash
 FAIL  src/controllers/todo.controller.test.ts
   TodoController
@@ -148,7 +150,7 @@ FAIL  src/controllers/todo.controller.test.ts
       ✕ returns 400 when title is empty (11ms)
 ```
 
-### 11.3.2 バリデーションミドルウェアの実装
+### 2. バリデーションミドルウェアの実装
 
 ```typescript
 // src/middleware/validation.ts
@@ -171,7 +173,7 @@ export const createTodoValidation: ValidationChain[] = [
 ];
 ```
 
-### 11.3.3 コントローラーの更新
+### 3. コントローラーの更新
 
 ```typescript
 // src/controllers/todo.controller.ts
@@ -208,7 +210,7 @@ export class TodoController {
 }
 ```
 
-テストのセットアップを更新：
+テストのセットアップを更新します。
 
 ```typescript
 // src/controllers/todo.controller.test.ts
@@ -237,7 +239,7 @@ PASS  src/controllers/todo.controller.test.ts
       ✓ returns 400 when title is empty (11ms)
 ```
 
-## 11.4 実装のポイント解説
+## 11.5 実装のポイント解説
 
 1. **レイヤー間の責務分離**
    - コントローラー：HTTPリクエスト/レスポンスの処理

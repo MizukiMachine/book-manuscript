@@ -154,7 +154,7 @@ export class TodoController {
 }
 ```
 
-テストのセットアップを更新
+テストのセットアップを更新します。
 
 ```typescript
 // src/controllers/todo.controller.test.ts

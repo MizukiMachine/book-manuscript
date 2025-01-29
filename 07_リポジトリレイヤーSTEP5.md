@@ -2,7 +2,7 @@
 
 ## 7.1 削除機能のテスト実装
 
-まず、Todoの削除機能に関するテストケースを実装します：
+まず、Todoの削除機能に関するテストケースを実装します。
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -66,7 +66,7 @@ describe('TodoRepository', () => {
 });
 ```
 
-今までと同じ用にこの段階ではテストは失敗します。
+今までと同様にこの段階ではテストは失敗します。  
 通らないことを確認の上、実装を行います。
 
 ## 7.2 削除機能の実装
@@ -143,8 +143,8 @@ PASS  src/repositories/todo.repository.test.ts
 
 ## 7.4 リポジトリレイヤーの完成
 
-これでTodoRepositoryの基本的なCRUD操作（Create, Read, Update, Delete）が全て実装できました。
-実装したメソッドは：
+これでTodoRepositoryの基本的なCRUD操作（Create, Read, Update, Delete）が全て実装できました。  
+実装したメソッドは、
 
 1. `create`: Todoの作成
 2. `findById`: IDによるTodoの検索
@@ -152,10 +152,6 @@ PASS  src/repositories/todo.repository.test.ts
 4. `update`: Todoの更新
 5. `delete`: Todoの削除
 
-各機能について：
-- エラー処理を適切に実装
-- 非同期処理に対応
-- 入力値の検証を実施
-- テストによる動作保証
+です。
 
 次章からは、このTodoRepositoryを使用するサービスレイヤーの実装に進みます。

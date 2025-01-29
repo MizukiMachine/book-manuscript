@@ -4,7 +4,7 @@
 
 前章で基本的なTodo作成機能を実装しましたが、ここではデータの整合性を保つためのバリデーション機能を追加していきます。
 
-### 4.1.1 バリデーションのテスト実装
+### 1. バリデーションのテスト実装
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -93,7 +93,7 @@ FAIL  src/repositories/todo.repository.test.ts
 
 テストが失敗したので、これらのテストを通すように実装を修正します。
 
-### 4.1.2 バリデーション機能の実装
+### 2. バリデーション機能の実装
 
 ```typescript
 // src/repositories/todo.repository.ts
@@ -138,7 +138,7 @@ export class TodoRepository {
    - `undefined`の場合でもエラーにならない安全な実装
    - TypeScriptの型システムと連携
 
-### 4.1.3 テスト実行結果
+### 3. テスト実行結果
 
 ```bash
 npm test
@@ -155,7 +155,7 @@ PASS  src/repositories/todo.repository.test.ts
 ## 4.2 エラーハンドリングの改善
 
 
-### 4.2.1 テストケースの更新
+### 1. テストケースの更新
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -201,7 +201,7 @@ describe('TodoRepository', () => {
 2. エラーに応じた適切な処理の実装が容易
 3. デバッグ時のエラー追跡が容易
 
-### 4.2.2 カスタムエラークラスの実装
+### 2. カスタムエラークラスの実装
 
 より明確なエラーハンドリングのため、カスタムエラークラスを実装します：
 
@@ -215,7 +215,7 @@ export class TodoValidationError extends Error {
 }
 ```
 
-### 4.2.3 リポジトリの更新
+### 3. リポジトリの更新
 
 ```typescript
 // src/repositories/todo.repository.ts

@@ -159,7 +159,7 @@ export class TodoController {
 }
 ```
 
-ルーティングの更新：
+こちらもルーティングのセットアップを更新しましょう。
 
 ```typescript
 // src/controllers/todo.controller.test.ts

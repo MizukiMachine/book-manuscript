@@ -36,7 +36,7 @@ export interface UpdateTodoDTO {
 
 ## 3.2 TodoRepositoryの初期実装
 
-まず、TodoRepositoryのテストファイルを作成します：
+まず、TodoRepositoryのテストファイルを作成します。
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -75,7 +75,7 @@ describe('TodoRepository', () => {
 - 非同期処理の`async/await`を使用：実際のデータベース操作を想定
 - `expect`文で各プロパティを個別に検証：より詳細なテスト
 
-テストを実行すると、以下のエラーが発生します：
+テストを実行すると、以下のエラーが発生します。
 
 ```bash
 FAIL  src/repositories/todo.repository.test.ts
@@ -83,7 +83,7 @@ FAIL  src/repositories/todo.repository.test.ts
     Cannot find module './todo.repository' from 'src/repositories/todo.repository.test.ts'
 ```
 これは当然の結果です。
-まだ`todo.repository.ts`ファイルを作成していないためエラーになります。
+まだ`todo.repository.ts`ファイルを作成していないためエラーになります。  
 では、このエラーを解消するため、TodoRepositoryの実装を行います。
 
 ```typescript
@@ -166,4 +166,3 @@ PASS  src/repositories/todo.repository.test.ts
 
 この章では、TDDの基本的なサイクルに従いながら、TodoRepositoryの基本機能を実装しました。  
 次章では、より高度な機能とバリデーションの実装に進みます。
-```
