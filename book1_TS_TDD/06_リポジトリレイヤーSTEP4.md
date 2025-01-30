@@ -1,17 +1,38 @@
 # 第6章 TodoRepositoryの更新機能実装
 
-## 6.1 更新機能のテスト実装
+## 6.1 更新機能の設計思想
 
-まず、Todoの更新機能に関するテストケースを実装します。
+更新機能は、既存のデータを変更するための重要な機能です。  
+リポジトリレイヤーでの更新機能には、以下の要件があります。
 
+1. データの整合性確保
+   - 存在するデータの検証
+   - 更新日時の管理
+   - 部分更新への対応
 
-1. 共通のテストユーティリティファイルの作成
+2. エラー処理
+   - 存在しないデータへの対応
+   - バリデーションエラーの処理
+   - 適切なエラーメッセージの提供
+
+3. データの永続性
+   - 更新内容の保存
+   - 更新前データの保持
+   - トランザクション的な動作の確保
+
+## 6.2 更新機能のテスト実装
+
+まず、共通のテストユーティリティファイルを作成します。  
+これは更新日時の検証のために必要です。
+
 ```typescript
 // src/test-utils/helpers.ts
 
 // テストヘルパー関数：時間差を作るため
 export const wait = (ms: number = 1) => new Promise(resolve => setTimeout(resolve, ms));
 ```
+
+次に、更新機能のテストケースを実装します。
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -33,7 +54,6 @@ describe('TodoRepository', () => {
             });
 
             // updatedAtの比較テストのため、
-            // Date オブジェクトの解像度（ミリ秒）の制限により
             // 意図的に時間差を作る
             await wait();
 
@@ -51,8 +71,8 @@ describe('TodoRepository', () => {
             expect(updated.title).toBe(updateDto.title);
             expect(updated.description).toBe(updateDto.description);
             expect(updated.completed).toBe(true);
-            expect(updated.updatedAt.getTime()).toBeGreaterThan(created.updatedAt.getTime());
-            expect(updated.id).toBe(todo.id); // IDは変更されないことを確認
+            expect(updated.updatedAt.getTime()).toBeGreaterThan(todo.updatedAt.getTime());
+            expect(updated.id).toBe(todo.id);// IDは変更されないことを確認
         });
 
         it('maintains unchanged fields', async () => {
@@ -72,7 +92,7 @@ describe('TodoRepository', () => {
             // 説明文が維持されていることを確認
             expect(updated.title).toBe('Updated Title');
             expect(updated.description).toBe('Original Description');
-            expect(updated.updatedAt.getTime()).toBeGreaterThan(created.updatedAt.getTime());
+            expect(updated.updatedAt.getTime()).toBeGreaterThan(todo.updatedAt.getTime());
         });
 
         it('throws error when todo does not exist', async () => {
@@ -95,25 +115,21 @@ describe('TodoRepository', () => {
 });
 ```
 
-**テストケースの解説：**
-1. **テストヘルパー関数**
-    - `wait` 関数を導入し、更新日時の比較を確実に
-    - ミリ秒単位の時間差を作成
+**更新機能テストのポイント：**
 
-2. **基本的な更新機能**
-    - 全フィールドの更新
-    - 更新日時の変更確認
-    - IDの不変性確認
+1. **時間差の制御**
+   - `wait`関数による意図的な遅延
+   - 更新日時の確実な変更を検証
 
-3. **部分更新の処理**
-    - 特定フィールドのみの更新
-    - 未指定フィールドの値維持
+2. **部分更新の検証**
+   - 一部のフィールドのみを更新
+   - 未更新フィールドの値維持を確認
 
-4. **エラーケースの処理**
-    - 存在しないTodoの更新
-    - バリデーションルールの適用
+3. **エラーケースの網羅**
+   - 存在しないTodoの更新試行
+   - バリデーションルールの適用確認
 
-## 6.2 更新機能の実装
+## 6.3 更新機能の実装
 
 ```typescript
 // src/repositories/todo.repository.ts
@@ -157,7 +173,7 @@ export class TodoRepository {
    ```typescript
    title: dto.title?.trim() ?? existingTodo.title
    ```
-   - `undefined`の場合のみ既存の値を使用
+   - `??`演算子で`undefined`の場合のみ既存の値を使用
    - `null`や空文字列は新しい値として扱う
 
 2. **スプレッド構文による不変性の維持**
@@ -168,25 +184,58 @@ export class TodoRepository {
    };
    ```
    - オブジェクトの安全なコピー
-   - 意図しない副作用の防止
+   - 意図しない変更の防止
 
-## 6.3 テスト実行結果
+3. **部分更新の実現**
+   - 更新されないフィールドは既存の値を維持
+   - 明示的に指定されたフィールドのみを更新
+
+## 6.4 テスト実行結果
 
 ```bash
 PASS  src/repositories/todo.repository.test.ts
   TodoRepository
-    create
-      ✓ creates a new todo with required fields (2ms)
-    findById
-      ✓ returns todo when exists (1ms)
-      ✓ returns null when todo does not exist (1ms)
-    findAll
-      ✓ returns empty array when no todos exist (1ms)
-      ✓ returns all todos (1ms)
     update
-      ✓ updates todo fields (1ms)
+      ✓ updates todo fields correctly (3ms)
+      ✓ maintains unchanged fields (2ms)
       ✓ throws error when todo does not exist (1ms)
-      ✓ maintains unchanged fields (1ms)
+      ✓ applies validation rules to updated fields (2ms)
 ```
 
+## 6.5 更新機能の特徴とまとめ
+
+### 1. データの整合性確保
+- 存在チェックによる安全な更新
+- バリデーションルールの適用
+- 更新日時の自動管理
+
+### 2. 柔軟な更新機能
+- 部分更新のサポート
+- 未指定フィールドの既存値維持
+- 型安全な更新処理
+
+### 3. エラー処理の充実
+- 存在しないデータへの対応
+- バリデーションエラーの処理
+- 明確なエラーメッセージ
+
+### 4. 実装上の工夫
+1. **オプショナルチェーンの活用**
+   ```typescript
+   dto.title?.trim()
+   ```
+   - 安全なプロパティアクセス
+   - `undefined`の適切な処理
+
+2. **不変性を意識した実装**
+   - 新しいオブジェクトの作成
+   - 副作用の防止
+   - デバッグのしやすさ
+
+3. **型システムの活用**
+   - UpdateTodoDTOによる更新可能フィールドの制限
+   - コンパイル時の型チェック
+   - 実行時エラーの防止
+
+この章では、TodoRepositoryの更新機能を実装しました。  
 次章では、Todoの削除機能の実装に進みます。

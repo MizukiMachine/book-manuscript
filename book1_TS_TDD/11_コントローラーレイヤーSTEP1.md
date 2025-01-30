@@ -1,19 +1,56 @@
 # 第11章 コントローラーレイヤーの基本実装
 
-## 11.1 準備
+## 11.1 コントローラーレイヤーの役割と設計思想
 
-まず、Express用の追加パッケージをインストールします。  
+「レイヤー」の考え方をさらに発展させ、コントローラーレイヤー（Controller Layer）は、アプリケーションの最も外側に位置し、以下の重要な役割を担います。
 
+1. **HTTPインターフェースの提供**
+   - RESTful APIエンドポイントの定義
+   - リクエストの受付と解析
+   - レスポンスの形成と返却
+
+2. **入力値の検証（バリデーション）**
+   - HTTPリクエストの形式確認
+   - 必須パラメータの検証
+   - 入力値の型チェック
+
+3. **レイヤー間の変換**
+   - HTTPリクエストからDTOへの変換
+   - サービスレイヤーの戻り値からHTTPレスポンスへの変換
+   - エラー情報の適切な形式への変換
+
+### コントローラーレイヤーの設計指針
+
+1. **シンプルな責務**
+   - ビジネスロジックを含まない
+   - データアクセスを直接行わない
+   - HTTPインターフェースとしての機能に集中
+
+2. **適切なエラーハンドリング**
+   - バリデーションエラー → 400 Bad Request
+   - リソース未検出 → 404 Not Found
+   - サーバーエラー → 500 Internal Server Error
+
+3. **一貫性のある応答形式**
+   - 成功時の統一されたレスポンス形式
+   - エラー時の統一された形式
+   - 適切なHTTPステータスコードの使用
+
+## 11.2 必要なパッケージのインストール
+
+Express.jsでのAPIエンドポイント実装に必要なパッケージをインストールします。
 
 ```bash
 npm install express-validator
 npm install --save-dev supertest @types/supertest
 ```
 
-## 11.2 コントローラーの基本実装
+**パッケージの役割：**
+- express-validator: HTTPリクエストの検証
+- supertest: APIエンドポイントのテスト実行
+- @types/supertest: supertestの型定義
 
-### 1. 初期テストの作成
-この章は比較的易しいソースコードだと思います。
+## 11.3 基本実装のテスト
 
 ```typescript
 // src/controllers/todo.controller.test.ts
@@ -60,15 +97,15 @@ describe('TodoController', () => {
     });
 });
 ```
-
 テスト実行結果：
 ```bash
 FAIL  src/controllers/todo.controller.test.ts
   ● Test suite failed to run
     Cannot find module './todo.controller'
 ```
+## 11.4 コントローラーの実装
 
-### 2. コントローラーの実装
+テストに対応する形でコントローラーを実装します。
 
 ```typescript
 // src/controllers/todo.controller.ts
@@ -94,6 +131,20 @@ export class TodoController {
 }
 ```
 
+**実装のポイント：**
+
+1. **Expressの型定義の活用**
+   ```typescript
+   async createTodo(req: Request, res: Response): Promise<void>
+   ```
+   - Express.jsの型システムを利用
+   - リクエスト/レスポンスの型安全な処理
+
+2. **HTTPステータスコードの使い分け**
+   - 201: リソース作成成功
+   - 400: クライアントエラー
+   - 500: サーバーエラー
+
 テスト実行結果：
 ```bash
 PASS  src/controllers/todo.controller.test.ts
@@ -102,8 +153,7 @@ PASS  src/controllers/todo.controller.test.ts
       ✓ creates a new todo with valid input (45ms)
 ```
 
-## 11.3 バリデーションの追加
-
+## 11.5 バリデーションの追加
 ### 1. バリデーションのテスト
 
 ```typescript
@@ -159,21 +209,31 @@ import { body, ValidationChain } from 'express-validator';
 export const createTodoValidation: ValidationChain[] = [
     // titleのバリデーション
     body('title')
-        .exists()        // titleフィールドが存在するか
-        .withMessage('Title is required')  // エラーメッセージ
-        .bail()          // 以降のバリデーションをスキップ
-        .notEmpty()      // 空文字でないか
+        .exists()
+        .withMessage('Title is required')
+        .bail()
+        .notEmpty()
         .withMessage('Title must not be empty')
-        .trim(),         // 前後の空白を削除
+        .trim(),
     
     // descriptionのバリデーション
     body('description')
-        .optional()      // 任意フィールド
-        .trim(),         // 前後の空白を削除
+        .optional()
+        .trim(),
 ];
 ```
 
-### 3. コントローラーの更新
+**バリデーションルールのポイント：**
+
+1. **必須項目の検証**
+   - `.exists()`: フィールドの存在確認
+   - `.notEmpty()`: 空値のチェック
+
+2. **オプショナル項目の処理**
+   - `.optional()`: 任意フィールドの指定
+   - `.trim()`: 入力値の正規化
+
+### 3. バリデーション付きコントローラーの実装
 
 ```typescript
 // src/controllers/todo.controller.ts
@@ -181,7 +241,6 @@ import { validationResult } from 'express-validator';
 
 export class TodoController {
     constructor(private service: TodoService) {}
-
     async createTodo(req: Request, res: Response): Promise<void> {
         try {
             // バリデーション結果のチェック
@@ -210,7 +269,8 @@ export class TodoController {
 }
 ```
 
-テストのセットアップを更新します。
+
+テストのセットアップを更新します。（ `createTodoValidation` を追加）
 
 ```typescript
 // src/controllers/todo.controller.test.ts
@@ -226,10 +286,11 @@ beforeEach(() => {
 
     // バリデーションミドルウェアを追加
     app.post('/todos', createTodoValidation, controller.createTodo.bind(controller));
-});
 ```
 
+
 最終的なテスト実行結果：
+
 ```bash
 PASS  src/controllers/todo.controller.test.ts
   TodoController
@@ -239,21 +300,20 @@ PASS  src/controllers/todo.controller.test.ts
       ✓ returns 400 when title is empty (11ms)
 ```
 
-## 11.5 実装のポイント解説
 
-1. **レイヤー間の責務分離**
-   - コントローラー：HTTPリクエスト/レスポンスの処理
-   - サービス：ビジネスロジック
-   - リポジトリ：データアクセス
+## 11.6 レイヤー間の関係性
 
-2. **エラーハンドリング**
-   - バリデーションエラー：400 Bad Request
-   - サービスエラー：400 Bad Request
-   - 予期せぬエラー：500 Internal Server Error
+コントローラーレイヤーは以下のような関係性を持ちます。
 
-3. **express-validatorの活用**
-   - リクエストの検証
-   - エラーメッセージのカスタマイズ
-   - 入力値の正規化（trim等）
+1. **サービスレイヤーとの関係**
+   - サービスレイヤーのメソッドを呼び出し
+   - ビジネスロジックの実行を委譲
+   - エラーハンドリングの統合
 
-次章では、検索・更新エンドポイントの実装に進みます。
+2. **HTTPインターフェースとしての役割**
+   - クライアントとの通信窓口
+   - データの受け渡し形式の定義
+   - エラー情報の適切な変換
+
+この章では、HTTPインターフェースとしてのコントローラーレイヤーの基本実装を行いました。  
+次章では、より高度な検索機能の実装に進みます。

@@ -1,8 +1,26 @@
 # 第7章 TodoRepositoryの削除機能実装
 
-## 7.1 削除機能のテスト実装
+## 7.1 削除機能の設計思想
 
-まず、Todoの削除機能に関するテストケースを実装します。
+削除機能はデータを永続的に除去する重要な操作です。  
+リポジトリレイヤーでの削除機能には、以下の要件があります。
+
+1. データの完全性
+   - 存在確認の実施
+   - 関連データへの影響の考慮
+   - 削除の確実な実行
+
+2. エラー処理
+   - 存在しないデータの処理
+   - 削除できない状態の検出
+   - 削除失敗時の対応
+
+3. トランザクション的な動作
+   - 削除操作の原子性確保
+   - 整合性の維持
+   - エラー時の状態保持
+
+## 7.2 削除機能のテスト実装
 
 ```typescript
 // src/repositories/todo.repository.test.ts
@@ -66,10 +84,24 @@ describe('TodoRepository', () => {
 });
 ```
 
+**削除機能テストのポイント：**
+
+1. **基本的な削除機能の確認**
+   - 存在するデータの削除
+   - 削除後のデータ不在確認
+
+2. **エラー処理の検証**
+   - 存在しないデータの削除試行
+   - 適切なエラーメッセージの確認
+
+3. **データの独立性確認**
+   - 他のデータへの影響がないことの確認
+   - 削除後の再作成の可能性確認
+
 今までと同様にこの段階ではテストは失敗します。  
 通らないことを確認の上、実装を行います。
 
-## 7.2 削除機能の実装
+## 7.3 削除機能の実装
 
 ```typescript
 // src/repositories/todo.repository.ts
@@ -117,31 +149,34 @@ export class TodoRepository {
    - JavaScriptのMapオブジェクトの機能を活用
    - 存在しないキーの削除は無害
 
-## 7.3 テスト実行結果
+## 7.4 テスト実行結果
 
 ```bash
 PASS  src/repositories/todo.repository.test.ts
   TodoRepository
-    create
-      ✓ creates a new todo with required fields (2ms)
-    findById
-      ✓ returns todo when exists (1ms)
-      ✓ returns null when todo does not exist (1ms)
-    findAll
-      ✓ returns empty array when no todos exist (1ms)
-      ✓ returns all todos (1ms)
-    update
-      ✓ updates todo fields correctly (1ms)
-      ✓ maintains unchanged fields (1ms)
-      ✓ throws error when todo does not exist (1ms)
     delete
-      ✓ deletes existing todo (1ms)
+      ✓ deletes existing todo (3ms)
       ✓ throws error when todo does not exist (1ms)
       ✓ does not affect other todos (1ms)
       ✓ allows creation after deletion with same title (1ms)
 ```
 
-## 7.4 リポジトリレイヤーの完成
+## 7.5 削除機能の特徴とまとめ
+
+### 1. 安全な削除操作
+- 存在確認による安全性確保
+- エラー時の明確な通知
+- データの整合性維持
+
+### 2. 独立性の確保
+- 他のデータへの影響を防止
+- 削除後の再利用を考慮
+- トランザクション的な動作
+
+### 3. シンプルな実装
+- 明確な責務
+- エラーハンドリングの統一
+- 将来の拡張性確保
 
 これでTodoRepositoryの基本的なCRUD操作（Create, Read, Update, Delete）が全て実装できました。  
 実装したメソッドは、
@@ -153,5 +188,4 @@ PASS  src/repositories/todo.repository.test.ts
 5. `delete`: Todoの削除
 
 です。
-
 次章からは、このTodoRepositoryを使用するサービスレイヤーの実装に進みます。
